@@ -1,0 +1,169 @@
+_schema-version: 3.3.0
+ID: cap_showcase
+version: 1.0.0
+description: "A simple CAP project."
+parameters:
+  enable-parallel-deployments: true
+  deploy_mode: html5-repo
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+modules:
+  - name: cap_showcase-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: cap_showcase-auth
+      - name: cap_showcase-db
+      - name: cap_showcase-destination
+
+  - name: cap_showcase-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: cap_showcase-db
+
+  - name: cap_showcase-app-deployer
+    type: com.sap.application.content
+    path: gen
+    build-parameters:
+      build-result: app/
+      requires:
+        - name: cap_showcasebasic_ui
+          artifacts:
+            - basic_ui.zip
+          target-path: app/
+        - name: cap_showcaseshowcase_ui
+          artifacts:
+            - showcase_ui.zip
+          target-path: app/
+    requires:
+      - name: cap_showcase-auth
+      - name: srv-api
+      - name: cap_showcase-html5-repo-host
+        parameters:
+          content-target: true
+          config:
+            HTML5Runtime_enabled: true
+    parameters:
+      config:
+        destinations:
+          - Name: srv-api
+            URL: ~{srv-api/srv-url}
+            Authentication: NoAuthentication
+            Type: HTTP
+            ProxyType: Internet
+            HTML5.ForwardAuthToken: true
+            HTML5.DynamicDestination: true
+
+  - name: cap_showcasebasic_ui
+    type: html5
+    path: app/basic_ui
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm ci
+        - npm run build
+      supported-platforms:
+        []
+  - name: cap_showcaseshowcase_ui
+    type: html5
+    path: app/showcase_ui
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm ci
+        - npm run build
+      supported-platforms:
+        []
+
+  - name: cap_showcase-destinations
+    type: com.sap.application.content
+    requires:
+      - name: cap_showcase-auth
+        parameters:
+          service-key:
+            name: cap_showcase-auth-key
+      - name: cap_showcase-html5-repo-host
+        parameters:
+          service-key:
+            name: cap_showcase-html5-repo-host-key
+      - name: srv-api
+      - name: cap_showcase-destination
+        parameters:
+          content-target: true
+    build-parameters:
+      no-source: true
+    parameters:
+      content:
+        instance:
+          existing_destinations_policy: update
+          destinations:
+            - Name: cap_showcase-html5-repository
+              ServiceInstanceName: cap_showcase-html5-repo-host
+              ServiceKeyName: cap_showcase-html5-repo-host-key
+              sap.cloud.service: cap_showcase.service
+            - Name: cap_showcase-auth
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: cap_showcase-xsuaa-service
+              ServiceKeyName: cap_showcase-auth-key
+              sap.cloud.service: cap_showcase.service
+
+resources:
+  - name: cap_showcase-auth
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      service-name: cap_showcase-xsuaa-service
+      path: ./xs-security.json
+      config:
+        xsappname: cap_showcase-${org}-${space}
+        tenant-mode: dedicated
+        oauth2-configuration:
+          credential-types:
+            - "binding-secret"
+            - "x509"
+        role-collections:
+          - name: 'support (cap_showcase ${org}-${space})'
+            description: 'generated'
+            role-template-references:
+              - '$XSAPPNAME.support'
+          - name: 'admin (cap_showcase ${org}-${space})'
+            description: 'generated'
+            role-template-references:
+              - '$XSAPPNAME.admin'
+  - name: cap_showcase-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: cap_showcase-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+    requires:
+      - name: srv-api
+
+  - name: cap_showcase-html5-repo-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
