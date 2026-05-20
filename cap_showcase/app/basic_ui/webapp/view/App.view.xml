@@ -1,0 +1,41 @@
+<mvc:View controllerName="basic.ui.basicui.controller.App"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m" height="100%">
+    <Page id="page" >
+          <Table
+            id="customersTable"
+            items="{
+                path: '/Customers'
+            }">
+            <columns>
+                <Column>
+                    <Text text="ID"/>
+                </Column>
+                <Column>
+                    <Text text="First Name"/>
+                </Column>
+                <Column>
+                    <Text text="Last Name"/>
+                </Column>
+                <Column>
+                    <Text text="Email"/>
+                </Column>
+                <Column>
+                    <Text text="Phone"/>
+                </Column>
+            </columns>
+            <items>
+                <ColumnListItem>
+                    <cells>
+                        <Text text="{ID}"/>
+                        <Text text="{firstName}"/>
+                        <Text text="{lastName}"/>
+                        <Text text="{email}"/>
+                        <Text text="{phone}"/>
+                    </cells>
+                </ColumnListItem>
+            </items>
+
+        </Table>
+    </Page>
+</mvc:View>
